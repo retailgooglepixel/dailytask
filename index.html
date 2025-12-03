@@ -12,7 +12,7 @@
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 
     <style>
-        :root { --bg-color: #f5f7fa; --card-bg: #ffffff; --text-color: #333; --primary-color: #007bff; --border-color: #e0e0e0; --today-highlight: #e7f3ff; }
+        :root { --bg-color: #f5f7fa; --card-bg: #ffffff; --text-color: #333; --primary-color: #007bff; --border-color: #e0e0e0; --today-highlight: #e7f3ff; --training-color: #4caf50; }
         body { font-family: 'Roboto', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         header h1 { margin: 0; }
@@ -22,18 +22,17 @@
         #authBtn { background-color: #4caf50; }
         #signoutBtn { background-color: #f44336; }
         
-        /* NEU: Kalender Styles */
         #calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 10px; }
         #calendar-header h2 { margin: 0; }
         #calendar-header button { background: none; border: 1px solid var(--border-color); cursor: pointer; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; }
         #calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
         .calendar-day-header { font-weight: bold; text-align: center; padding: 10px 0; }
         .calendar-day { background-color: var(--card-bg); border: 1px solid var(--border-color); min-height: 120px; padding: 8px; border-radius: 4px; }
-        .calendar-day.other-month { background-color: #f8f9fa; }
         .calendar-day.today { background-color: var(--today-highlight); border: 1px solid var(--primary-color); }
         .day-number { font-weight: bold; margin-bottom: 5px; }
 
         .task-card { background-color: #f9f9f9; border: 1px solid #eee; border-left: 3px solid var(--primary-color); border-radius: 4px; padding: 5px; margin-bottom: 5px; font-size: 12px; }
+        .task-card.training-card { border-left-color: var(--training-color); }
         .task-card h3 { margin: 0 0 4px 0; font-size: 13px; }
         .task-card p { margin: 0; color: #555; display: flex; align-items: center; gap: 4px; }
         .task-card .person-icon { width: 14px; height: 14px; }
@@ -43,12 +42,11 @@
         .close-btn { position: absolute; top: 15px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; }
         .form-step { display: none; }
         .form-step.active { display: block; }
-        #taskForm label { display: block; margin-bottom: 8px; font-weight: 500; }
-        #taskForm input, #taskForm textarea, #taskForm select { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; }
-        #taskForm button { padding: 10px 15px; border-radius: 6px; border: 1px solid var(--primary-color); background-color: var(--primary-color); color: white; cursor: pointer; margin-right: 10px; }
-        #taskForm button.prev-btn { background-color: transparent; color: var(--primary-color); }
+        #taskForm label, #trainingForm label { display: block; margin-bottom: 8px; font-weight: 500; }
+        #taskForm input, #taskForm textarea, #taskForm select, #trainingForm input, #trainingForm textarea, #trainingForm input[type="file"] { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; }
+        #taskForm button, #trainingForm button { padding: 10px 15px; border-radius: 6px; border: 1px solid var(--primary-color); background-color: var(--primary-color); color: white; cursor: pointer; margin-right: 10px; }
+        #taskForm button.prev-btn, #trainingForm button.prev-btn { background-color: transparent; color: var(--primary-color); }
         .calendar-info { background-color: #e7f3ff; border: 1px solid #b3d7ff; padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 14px; }
-        .calendar-info ul { margin: 0; padding-left: 20px; }
     </style>
 </head>
 <body>
@@ -58,7 +56,7 @@
         <div class="header-buttons">
             <button id="authBtn">Mit Google anmelden</button>
             <button id="signoutBtn" style="display: none;">Abmelden</button>
-            <button id="openModalBtn">+ Neue Aufgabe</button>
+            <button id="openModalBtn">+ Neuer Eintrag</button>
         </div>
     </header>
 
@@ -72,98 +70,109 @@
         <div id="calendar-grid"></div>
     </main>
 
-    <!-- Modal mit neuer Reihenfolge der Schritte -->
+    <!-- Modal 1: Themenauswahl -->
+    <div id="themaModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Neuen Eintrag erstellen</h2>
+            <label for="themaAuswahl">Wählen Sie ein Thema aus:</label>
+            <select id="themaAuswahl" style="width: 100%; padding: 10px; margin-bottom: 20px;">
+                <option value="">-- Bitte auswählen --</option>
+                <option value="Training">Training</option>
+                <option value="Konzept">Konzept</option>
+                <option value="Admin / Orga">Admin / Orga</option>
+                <option value="Blocker">Blocker</option>
+            </select>
+            <button id="themaWeiterBtn">Weiter</button>
+        </div>
+    </div>
+    
+    <!-- Modal 2: Normale Aufgabe erstellen -->
     <div id="taskModal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>
-            <h2>Neue Aufgabe erstellen</h2>
+            <h2 id="taskModalTitle">Neue Aufgabe erstellen</h2>
             <form id="taskForm">
-                <!-- Schritt 1: Deadline (dient auch als Datum für die Planung) -->
                 <div class="form-step active" data-step="1">
                     <label for="taskDeadline">Für welchen Tag ist die Aufgabe (Deadline)?</label>
                     <input type="date" id="taskDeadline" required>
-                    <div class="calendar-info">
-                        <p><strong>Google Kalender Termine:</strong></p>
-                        <div id="calendarEvents"><em>Bitte Datum auswählen & anmelden.</em></div>
-                    </div>
+                    <div class="calendar-info"><p><strong>Google Kalender Termine:</strong></p><div id="calendarEvents"></div></div>
                     <button type="button" class="next-btn">Weiter</button>
                 </div>
-
-                <!-- Schritt 2: Zuständig -->
                 <div class="form-step" data-step="2">
                     <label for="taskZustaendig">Wer ist zuständig?</label>
-                    <input type="text" id="taskZustaendig" placeholder="z.B. Max Mustermann" required>
-                    <button type="button" class="prev-btn">Zurück</button>
-                    <button type="button" class="next-btn">Weiter</button>
+                    <input type="text" id="taskZustaendig" required>
+                    <button type="button" class="prev-btn">Zurück</button><button type="button" class="next-btn">Weiter</button>
                 </div>
-
-                <!-- Schritt 3: Topic -->
                 <div class="form-step" data-step="3">
-                    <label for="taskTopic">Geben Sie ein Topic an:</label>
-                    <input type="text" id="taskTopic" placeholder="z.B. UI-Mockups erstellen" required>
-                    <button type="button" class="prev-btn">Zurück</button>
-                    <button type="button" class="next-btn">Weiter</button>
-                </div>
-
-                <!-- Schritt 4: Inhalt -->
-                <div class="form-step" data-step="4">
                     <label for="taskInhalt">Details zur Aufgabe:</label>
-                    <textarea id="taskInhalt" rows="4" placeholder="Beschreiben Sie die Aufgabe genauer..."></textarea>
-                    <button type="button" class="prev-btn">Zurück</button>
-                    <button type="button" class="next-btn">Weiter</button>
+                    <textarea id="taskInhalt" rows="4"></textarea>
+                    <button type="button" class="prev-btn">Zurück</button><button type="button" class="next-btn">Weiter</button>
                 </div>
-                
-                <!-- Schritt 5: Status -->
-                <div class="form-step" data-step="5">
-                    <label for="taskStatus">Setzen Sie den initialen Status:</label>
-                    <select id="taskStatus">
-                        <option value="Offen">Offen</option>
-                        <option value="In Bearbeitung">In Bearbeitung</option>
-                        <option value="Wartet auf Rückmeldung">Wartet auf Rückmeldung</option>
-                        <option value="Erledigt">Erledigt</option>
-                    </select>
-                    <button type="button" class="prev-btn">Zurück</button>
-                    <button type="submit">Aufgabe speichern</button>
+                <div class="form-step" data-step="4">
+                    <label for="taskStatus">Setzen Sie den Status:</label>
+                    <select id="taskStatus"><option>Offen</option><option>In Bearbeitung</option><option>Wartet auf Rückmeldung</option><option>Erledigt</option></select>
+                    <button type="button" class="prev-btn">Zurück</button><button type="submit">Aufgabe speichern</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Modal 3: Training erstellen -->
+    <div id="trainingModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Neues Training eintragen</h2>
+            <form id="trainingForm">
+                <label for="trainingPartner">Partner:</label>
+                <input type="text" id="trainingPartner" required>
+                <label for="trainingDatum">Datum:</label>
+                <input type="date" id="trainingDatum" required>
+                <label for="trainingUhrzeit">Uhrzeit:</label>
+                <input type="time" id="trainingUhrzeit" required>
+                <label for="trainingDauer">Dauer (in Std.):</label>
+                <input type="number" id="trainingDauer" step="0.5" required>
+                <label for="trainingFoto">Foto hochladen (optional):</label>
+                <input type="file" id="trainingFoto" accept="image/*">
+                <label for="trainingFeedback">Feedback:</label>
+                <textarea id="trainingFeedback" rows="3"></textarea>
+                <button type="submit">Training speichern</button>
+            </form>
+        </div>
+    </div>
+
     <script>
-        // Konfiguration (Client ID und Script URL)
-        const CLIENT_ID = '117142914259-15kiqsdvqhn8jprcepfmrcajg0nge8iv.apps.googleusercontent.com';
+        // =======================
+        // KONFIGURATION
+        // =======================
+        const CLIENT_ID = '117142914259-15kiqsdvqhn8jprcepfmrcajg0nge8iv.apps.googleusercontent.com'; // Dies ist die Client-ID, die Sie bereits hatten
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
         
         // Ihre neue Web-App-URL wurde hier eingefügt
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxcW8XPG1gNxhFmTgb6wH0iKRBiBhqSaVcLw-A1zmC-dYJu25EIRU08FiIIrcmCn7nC/exec';
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwj5CkrwyHAfQNlbQ53gEJejXCAaw475H6W1J7LUer_Grq9h_IP3wVb9sTEWxqgnOar/exec';
         
-        // Globale Variablen
+        // =======================
+        // GLOBALE VARIABLEN & INITIALISIERUNG
+        // =======================
         let tokenClient;
-        let tasks = [];
+        let allEntries = [];
         let currentMonth = new Date().getMonth();
         let currentYear = new Date().getFullYear();
 
-        // Initialisierung
         function gapiLoaded() { gapi.load('client', initializeGapiClient); }
         async function initializeGapiClient() { await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] }); }
         function gisLoaded() {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: '', 
-            });
+            tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: '' });
         }
         
         document.addEventListener('DOMContentLoaded', () => {
-            // Event Listeners für Buttons
             document.getElementById('authBtn').onclick = handleAuthClick;
             document.getElementById('signoutBtn').onclick = handleSignoutClick;
             document.getElementById('prevMonthBtn').onclick = () => changeMonth(-1);
             document.getElementById('nextMonthBtn').onclick = () => changeMonth(1);
             document.getElementById('taskDeadline').addEventListener('change', loadCalendarEvents);
-            
-            fetchTasks();
-            setupModalAndForm();
+            fetchEntries();
+            setupAllModals();
         });
 
         // =======================
@@ -171,13 +180,8 @@
         // =======================
         function changeMonth(direction) {
             currentMonth += direction;
-            if (currentMonth < 0) {
-                currentMonth = 11;
-                currentYear--;
-            } else if (currentMonth > 11) {
-                currentMonth = 0;
-                currentYear++;
-            }
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
             generateCalendar(currentYear, currentMonth);
         }
 
@@ -185,52 +189,54 @@
             const grid = document.getElementById('calendar-grid');
             const header = document.getElementById('currentMonthYear');
             grid.innerHTML = '';
+            header.innerText = new Date(year, month).toLocaleString('de-DE', { month: 'long', year: 'numeric' });
             
-            const monthName = new Date(year, month).toLocaleString('de-DE', { month: 'long' });
-            header.innerText = `${monthName} ${year}`;
-            
-            const firstDayOfMonth = new Date(year, month, 1).getDay(); // Sonntag=0, Montag=1, ...
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             
             const weekdaysContainer = document.getElementById('calendar-weekdays');
-            if(weekdaysContainer.innerHTML === '') {
-                weekdaysContainer.id = 'calendar-grid'; 
-                const weekdays = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-                weekdays.forEach(day => {
+            if (weekdaysContainer.innerHTML === '') {
+                weekdaysContainer.id = 'calendar-grid';
+                ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'].forEach(day => {
                     weekdaysContainer.innerHTML += `<div class="calendar-day-header">${day}</div>`;
                 });
             }
 
-            // Korrekte Anzahl an leeren Tagen am Anfang
-            let startingDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; // Konvertiert zu Mo=0, So=6
+            let startingDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
             for (let i = 0; i < startingDay; i++) {
                 grid.innerHTML += '<div class="calendar-day other-month"></div>';
             }
 
-            // Tage des Monats
             for (let day = 1; day <= daysInMonth; day++) {
                 const date = new Date(year, month, day);
-                
                 let dayCell = document.createElement('div');
                 dayCell.className = 'calendar-day';
-                if (date.toDateString() === new Date().toDateString()) {
-                    dayCell.classList.add('today');
-                }
-
+                if (date.toDateString() === new Date().toDateString()) dayCell.classList.add('today');
                 dayCell.innerHTML = `<div class="day-number">${day}</div>`;
                 
-                const tasksForDay = tasks.filter(task => new Date(task.date).toDateString() === date.toDateString());
-                tasksForDay.forEach(task => {
-                    dayCell.innerHTML += `
-                        <div class="task-card">
-                            <h3>${task.topic}</h3>
-                            <p>
-                                <svg class="person-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                                ${task.zustaendig}
-                            </p>
-                        </div>`;
+                const entriesForDay = allEntries.filter(entry => new Date(entry.date || entry.datum).toDateString() === date.toDateString());
+                
+                entriesForDay.forEach(entry => {
+                    if (entry.type === 'task') {
+                        dayCell.innerHTML += `
+                            <div class="task-card">
+                                <h3>${entry.topic}</h3>
+                                <p><svg class="person-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                                ${entry.zustaendig}</p>
+                            </div>`;
+                    } else if (entry.type === 'training') {
+                        let photoHtml = '';
+                        if (entry['foto-link'] && entry['foto-link'].startsWith('http')) {
+                            photoHtml = `<p><a href="${entry['foto-link']}" target="_blank" rel="noopener noreferrer">Foto ansehen</a></p>`;
+                        }
+                        dayCell.innerHTML += `
+                            <div class="task-card training-card">
+                                <h3>Training: ${entry.partner}</h3>
+                                <p>${entry.uhrzeit}, ${entry.dauer}h</p>
+                                ${photoHtml}
+                            </div>`;
+                    }
                 });
-
                 grid.appendChild(dayCell);
             }
         }
@@ -239,28 +245,19 @@
         // AUTHENTIFIZIERUNG & GOOGLE CALENDAR API
         // =======================
         function handleAuthClick() {
-            tokenClient.callback = async (resp) => {
-                if (resp.error) throw(resp);
-                updateSigninStatus(true);
-                await loadCalendarEvents();
-            };
+            tokenClient.callback = async(r) => { if(r.error) throw(r); updateSigninStatus(true); await loadCalendarEvents(); };
             tokenClient.requestAccessToken({ prompt: 'consent' });
         }
         function handleSignoutClick() {
             const token = gapi.client.getToken();
-            if (token) {
-                google.accounts.oauth2.revoke(token.access_token);
-                gapi.client.setToken('');
-                updateSigninStatus(false);
-                document.getElementById('calendarEvents').innerHTML = '<em>Bitte anmelden.</em>';
-            }
+            if (token) { google.accounts.oauth2.revoke(token.access_token); gapi.client.setToken(''); updateSigninStatus(false); }
         }
         function updateSigninStatus(isSignedIn) {
             document.getElementById('authBtn').style.display = isSignedIn ? 'none' : 'block';
             document.getElementById('signoutBtn').style.display = isSignedIn ? 'block' : 'none';
         }
         async function loadCalendarEvents() {
-            const selectedDate = document.getElementById('taskDeadline').value;
+             const selectedDate = document.getElementById('taskDeadline').value;
             if (!selectedDate || !gapi.client.getToken()) return;
             
             const eventsDiv = document.getElementById('calendarEvents');
@@ -294,66 +291,123 @@
         }
 
         // =======================
-        // TASK MANAGEMENT & FORMULAR
+        // DATEN-MANAGEMENT & FORMULARE
         // =======================
-        async function fetchTasks() {
+        async function fetchEntries() {
             try {
                 const response = await fetch(GOOGLE_SCRIPT_URL);
                 if (!response.ok) throw new Error('Netzwerkfehler');
-                tasks = await response.json();
-                generateCalendar(currentYear, currentMonth); // Kalender mit den neuen Daten rendern
+                allEntries = await response.json();
+                generateCalendar(currentYear, currentMonth);
             } catch (error) {
                 document.getElementById('calendar-grid').innerHTML = '<p>Aufgaben konnten nicht geladen werden.</p>';
             }
         }
 
-        function setupModalAndForm() {
-            const modal = document.getElementById('taskModal');
-            document.getElementById('openModalBtn').onclick = () => modal.style.display = 'flex';
-            document.querySelector('.close-btn').onclick = () => modal.style.display = 'none';
-            window.onclick = (event) => { if (event.target == modal) modal.style.display = 'none'; }
+        function setupAllModals() {
+            const themaModal = document.getElementById('themaModal');
+            const taskModal = document.getElementById('taskModal');
+            const trainingModal = document.getElementById('trainingModal');
             
-            const form = document.getElementById('taskForm');
-            const nextBtns = document.querySelectorAll('.next-btn');
-            const prevBtns = document.querySelectorAll('.prev-btn');
-            const formSteps = document.querySelectorAll('.form-step');
-            let currentStep = 1;
+            document.getElementById('openModalBtn').onclick = () => themaModal.style.display = 'flex';
+            
+            document.querySelectorAll('.close-btn').forEach(btn => btn.onclick = () => {
+                themaModal.style.display = 'none';
+                taskModal.style.display = 'none';
+                trainingModal.style.display = 'none';
+            });
+            
+            document.getElementById('themaWeiterBtn').onclick = () => {
+                const auswahl = document.getElementById('themaAuswahl').value;
+                if (!auswahl) return;
+                
+                themaModal.style.display = 'none';
+                if (auswahl === 'Training') {
+                    trainingModal.style.display = 'flex';
+                } else {
+                    document.getElementById('taskModalTitle').innerText = `Neue Aufgabe: ${auswahl}`;
+                    document.getElementById('taskModal').dataset.topic = auswahl;
+                    taskModal.style.display = 'flex';
+                }
+            };
+            
+            setupTaskForm();
+            setupTrainingForm();
+        }
 
-            function showStep(stepNumber) {
-                formSteps.forEach(step => step.classList.remove('active'));
-                document.querySelector(`.form-step[data-step="${stepNumber}"]`).classList.add('active');
-            }
-            
-            nextBtns.forEach(btn => btn.addEventListener('click', () => { if (currentStep < formSteps.length) { currentStep++; showStep(currentStep); } }));
-            prevBtns.forEach(btn => btn.addEventListener('click', () => { if (currentStep > 1) { currentStep--; showStep(currentStep); } }));
+        function setupTaskForm() {
+            const form = document.getElementById('taskForm');
+            const nextBtns = form.querySelectorAll('.next-btn');
+            const prevBtns = form.querySelectorAll('.prev-btn');
+            const formSteps = form.querySelectorAll('.form-step');
+            let currentStep = 1;
+            function showStep(n) { formSteps.forEach(s => s.classList.remove('active')); form.querySelector(`.form-step[data-step="${n}"]`).classList.add('active'); }
+            nextBtns.forEach(b => b.onclick = () => { if(currentStep < formSteps.length) { currentStep++; showStep(currentStep); } });
+            prevBtns.forEach(b => b.onclick = () => { if(currentStep > 1) { currentStep--; showStep(currentStep); } });
 
             form.addEventListener('submit', async (event) => {
                 event.preventDefault();
                 const deadline = document.getElementById('taskDeadline').value;
-                const newTask = {
-                    date: deadline, 
+                const taskPayload = {
+                    topic: document.getElementById('taskModal').dataset.topic,
+                    date: deadline,
                     deadline: deadline,
                     zustaendig: document.getElementById('taskZustaendig').value,
-                    topic: document.getElementById('taskTopic').value,
                     inhalt: document.getElementById('taskInhalt').value,
                     status: document.getElementById('taskStatus').value
                 };
+                
+                await sendData({ action: 'addTask', payload: taskPayload });
+                
+                document.getElementById('taskModal').style.display = 'none';
+                form.reset(); currentStep = 1; showStep(currentStep);
+            });
+        }
 
-                try {
-                    await fetch(GOOGLE_SCRIPT_URL, {
-                        method: 'POST', mode: 'no-cors', 
-                        body: JSON.stringify(newTask), headers: { 'Content-Type': 'application/json' }
-                    });
-                    setTimeout(() => fetchTasks(), 1000); // Neu laden
-                } catch (error) {
-                    alert('Die Aufgabe konnte nicht gespeichert werden.');
+        function setupTrainingForm() {
+            const form = document.getElementById('trainingForm');
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+
+                const trainingPayload = {
+                    partner: document.getElementById('trainingPartner').value,
+                    datum: document.getElementById('trainingDatum').value,
+                    uhrzeit: document.getElementById('trainingUhrzeit').value,
+                    dauer: document.getElementById('trainingDauer').value,
+                    feedback: document.getElementById('trainingFeedback').value,
+                };
+
+                const photoInput = document.getElementById('trainingFoto');
+                if (photoInput.files && photoInput.files[0]) {
+                    const file = photoInput.files[0];
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => {
+                        trainingPayload.photoData = reader.result;
+                        trainingPayload.photoFilename = file.name;
+                        trainingPayload.photoMimeType = file.type;
+                        sendData({ action: 'addTraining', payload: trainingPayload });
+                    };
+                    reader.onerror = () => { alert('Fehler beim Verarbeiten des Bildes.'); };
+                } else {
+                    sendData({ action: 'addTraining', payload: trainingPayload });
                 }
 
-                modal.style.display = 'none';
+                document.getElementById('trainingModal').style.display = 'none';
                 form.reset();
-                currentStep = 1;
-                showStep(currentStep);
             });
+        }
+
+        async function sendData(data) {
+             try {
+                await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST', mode: 'no-cors', 
+                    body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' }
+                });
+                setTimeout(() => fetchEntries(), 1000);
+            } catch (error) {
+                alert('Eintrag konnte nicht gespeichert werden.');
+            }
         }
     </script>
 </body>
