@@ -148,8 +148,8 @@
         const CLIENT_ID = '117142914259-15kiqsdvqhn8jprcepfmrcajg0nge8iv.apps.googleusercontent.com';
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
         
-        // Ihre neue Web-App-URL wurde hier platziert
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcqXKvIA8DDPsrVqP1Sa8AuEhnTjvZ_x913pB3Ux7fImSR8GY_zcOnieNmsc-5hVwp/exec';
+        // Ihre neue Web App-URL wurde hier platziert
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxyfWNXA3XXV78HsYohbw9Cr0gzxaNrMd97VOzHYipo6J4-Qj_HSHzKcFNPsnUh_uk/exec';
         
         // =======================
         // GLOBALE VARIABLEN & INITIALISIERUNG
@@ -297,7 +297,9 @@
             try {
                 const response = await fetch(GOOGLE_SCRIPT_URL, { cache: 'no-cache' });
                 if (!response.ok) throw new Error('Netzwerkfehler beim Laden');
-                allEntries = await response.json();
+                const data = await response.json();
+                if (data.status === 'error') throw new Error(data.message);
+                allEntries = data;
                 generateCalendar(currentYear, currentMonth);
             } catch (error) {
                 console.error("Fehler in fetchEntries:", error);
@@ -404,11 +406,17 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
+
+                if (!response.ok) {
+                     throw new Error(`HTTP-Fehler! Status: ${response.status}`);
+                }
+
                 const result = await response.json();
+
                 if (result.status === 'success') {
                     fetchEntries();
                 } else {
-                    throw new Error(result.message);
+                    throw new Error(result.message || 'Unbekannter Fehler im Skript.');
                 }
             } catch (error) {
                 console.error('Fehler beim Speichern:', error);
