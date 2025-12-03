@@ -1,61 +1,3 @@
-// Code.gs (Version 2)
-
-const sheetName = 'Aufgaben';
-const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-
-function doGet(e) {
-  try {
-    const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) {
-      return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
-    }
-    const headers = data.shift();
-    const tasks = data.map((row) => {
-      const task = {};
-      headers.forEach((header, i) => {
-        const key = header.toLowerCase().trim();
-        task[key] = row[i];
-      });
-      return task;
-    });
-    return ContentService.createTextOutput(JSON.stringify(tasks)).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-function doPost(e) {
-  try {
-    const newTask = JSON.parse(e.postData.contents);
-    
-    const idColumn = sheet.getRange("A2:A").getValues().flat().filter(String);
-    const newId = idColumn.length > 0 ? Math.max(...idColumn) + 1 : 1;
-    
-    // Reihenfolge entspricht jetzt den neuen Spalten in der Tabelle
-    sheet.appendRow([
-      newId,
-      newTask.topic || '',
-      newTask.inhalt || '',
-      new Date(newTask.date),      // NEU: Vollständiges Datum
-      new Date(newTask.deadline),
-      newTask.zustaendig || '',    // NEU: Zuständige Person
-      newTask.status || 'Offen'
-    ]);
-    
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Task added', id: newId })).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.toString() })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-```**Wichtig:** Nachdem Sie das Skript gespeichert haben, müssen Sie es **neu bereitstellen**, damit die Änderungen wirksam werden. Gehen Sie auf `Bereitstellen > Deployments verwalten`, wählen Sie Ihr Deployment aus, klicken Sie auf das Stift-Symbol (Bearbeiten), wählen Sie bei "Version" die Option **"Neue Version"** und klicken Sie auf "Bereitstellen". Sie müssen die Web-App-URL nicht neu kopieren, sie bleibt dieselbe.
-
----
-
-### **Schritt 3: Die komplette, neue `index.html`-Datei**
-
-Dies ist die All-in-One-Datei. Sie enthält die neue Kalender-Oberfläche, den geänderten Eingabeprozess und die gesamte Logik dafür. Ersetzen Sie den kompletten Inhalt Ihrer `index.html` auf GitHub mit dem folgenden Code.
-
-```html
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -191,7 +133,9 @@ Dies ist die All-in-One-Datei. Sie enthält die neue Kalender-Oberfläche, den g
         // Konfiguration (Client ID und Script URL)
         const CLIENT_ID = '117142914259-15kiqsdvqhn8jprcepfmrcajg0nge8iv.apps.googleusercontent.com';
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx-qf3pV-R4P1M-795IT7yUzacbko2-DPIZPQgXUBqIcalhZuuxuqYIUAY3CNhpOdMfug/exec';
+        
+        // Ihre neue Web-App-URL wurde hier eingefügt
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxcW8XPG1gNxhFmTgb6wH0iKRBiBhqSaVcLw-A1zmC-dYJu25EIRU08FiIIrcmCn7nC/exec';
         
         // Globale Variablen
         let tokenClient;
@@ -245,28 +189,27 @@ Dies ist die All-in-One-Datei. Sie enthält die neue Kalender-Oberfläche, den g
             const monthName = new Date(year, month).toLocaleString('de-DE', { month: 'long' });
             header.innerText = `${monthName} ${year}`;
             
-            const firstDay = new Date(year, month, 1).getDay(); // Sonntag = 0, Montag = 1
+            const firstDayOfMonth = new Date(year, month, 1).getDay(); // Sonntag=0, Montag=1, ...
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             
-            // Wochentage-Header nur einmal erstellen
             const weekdaysContainer = document.getElementById('calendar-weekdays');
             if(weekdaysContainer.innerHTML === '') {
-                weekdaysContainer.id = 'calendar-grid'; // Wir nutzen das grid layout mit
+                weekdaysContainer.id = 'calendar-grid'; 
                 const weekdays = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
                 weekdays.forEach(day => {
                     weekdaysContainer.innerHTML += `<div class="calendar-day-header">${day}</div>`;
                 });
             }
 
-            // Leere Tage am Anfang des Monats
-            for (let i = 0; i < (firstDay === 0 ? 6 : firstDay -1) ; i++) {
+            // Korrekte Anzahl an leeren Tagen am Anfang
+            let startingDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; // Konvertiert zu Mo=0, So=6
+            for (let i = 0; i < startingDay; i++) {
                 grid.innerHTML += '<div class="calendar-day other-month"></div>';
             }
 
             // Tage des Monats
             for (let day = 1; day <= daysInMonth; day++) {
                 const date = new Date(year, month, day);
-                const dateString = date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
                 
                 let dayCell = document.createElement('div');
                 dayCell.className = 'calendar-day';
@@ -276,7 +219,6 @@ Dies ist die All-in-One-Datei. Sie enthält die neue Kalender-Oberfläche, den g
 
                 dayCell.innerHTML = `<div class="day-number">${day}</div>`;
                 
-                // Tasks für diesen Tag finden und hinzufügen
                 const tasksForDay = tasks.filter(task => new Date(task.date).toDateString() === date.toDateString());
                 tasksForDay.forEach(task => {
                     dayCell.innerHTML += `
@@ -389,7 +331,7 @@ Dies ist die All-in-One-Datei. Sie enthält die neue Kalender-Oberfläche, den g
                 event.preventDefault();
                 const deadline = document.getElementById('taskDeadline').value;
                 const newTask = {
-                    date: deadline, // Das Datum der Aufgabe ist dasselbe wie die Deadline
+                    date: deadline, 
                     deadline: deadline,
                     zustaendig: document.getElementById('taskZustaendig').value,
                     topic: document.getElementById('taskTopic').value,
