@@ -147,7 +147,9 @@
         // =======================
         const CLIENT_ID = '117142914259-15kiqsdvqhn8jprcepfmrcajg0nge8iv.apps.googleusercontent.com';
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwj5CkrwyHAfQNlbQ53gEJejXCAaw475H6W1J7LUer_Grq9h_IP3wVb9sTEWxqgnOar/exec';
+        
+        // Ihre neue Web-App-URL wurde hier platziert
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcqXKvIA8DDPsrVqP1Sa8AuEhnTjvZ_x913pB3Ux7fImSR8GY_zcOnieNmsc-5hVwp/exec';
         
         // =======================
         // GLOBALE VARIABLEN & INITIALISIERUNG
@@ -293,12 +295,12 @@
         // =======================
         async function fetchEntries() {
             try {
-                // Änderung 2: Füge die 'cache: no-cache' Option hinzu.
                 const response = await fetch(GOOGLE_SCRIPT_URL, { cache: 'no-cache' });
-                if (!response.ok) throw new Error('Netzwerkfehler');
+                if (!response.ok) throw new Error('Netzwerkfehler beim Laden');
                 allEntries = await response.json();
                 generateCalendar(currentYear, currentMonth);
             } catch (error) {
+                console.error("Fehler in fetchEntries:", error);
                 document.getElementById('calendar-grid').innerHTML = '<p>Aufgaben konnten nicht geladen werden.</p>';
             }
         }
@@ -344,7 +346,7 @@
             nextBtns.forEach(b => b.onclick = () => { if(currentStep < formSteps.length) { currentStep++; showStep(currentStep); } });
             prevBtns.forEach(b => b.onclick = () => { if(currentStep > 1) { currentStep--; showStep(currentStep); } });
 
-            form.addEventListener('submit', async (event) => {
+            form.addEventListener('submit', (event) => {
                 event.preventDefault();
                 const deadline = document.getElementById('taskDeadline').value;
                 const taskPayload = {
@@ -355,9 +357,7 @@
                     inhalt: document.getElementById('taskInhalt').value,
                     status: document.getElementById('taskStatus').value
                 };
-                
-                await sendData({ action: 'addTask', payload: taskPayload });
-                
+                sendData({ action: 'addTask', payload: taskPayload });
                 document.getElementById('taskModal').style.display = 'none';
                 form.reset(); currentStep = 1; showStep(currentStep);
             });
@@ -396,17 +396,23 @@
                 form.reset();
             });
         }
-
+        
         async function sendData(data) {
-             try {
-                await fetch(GOOGLE_SCRIPT_URL, {
-                    method: 'POST', mode: 'no-cors', 
-                    body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' }
+            try {
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
                 });
-                // Änderung 1: Erhöhe den Timeout auf 2000 Millisekunden (2 Sekunden)
-                setTimeout(() => fetchEntries(), 2000);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    fetchEntries();
+                } else {
+                    throw new Error(result.message);
+                }
             } catch (error) {
-                alert('Eintrag konnte nicht gespeichert werden.');
+                console.error('Fehler beim Speichern:', error);
+                alert('Eintrag konnte nicht gespeichert werden: ' + error.message);
             }
         }
     </script>
