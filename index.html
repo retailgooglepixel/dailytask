@@ -145,10 +145,8 @@
         // =======================
         // KONFIGURATION
         // =======================
-        const CLIENT_ID = '117142914259-15kiqsdvqhn8jprcepfmrcajg0nge8iv.apps.googleusercontent.com'; // Dies ist die Client-ID, die Sie bereits hatten
+        const CLIENT_ID = '117142914259-15kiqsdvqhn8jprcepfmrcajg0nge8iv.apps.googleusercontent.com';
         const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
-        
-        // Ihre neue Web-App-URL wurde hier eingefügt
         const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwj5CkrwyHAfQNlbQ53gEJejXCAaw475H6W1J7LUer_Grq9h_IP3wVb9sTEWxqgnOar/exec';
         
         // =======================
@@ -295,7 +293,8 @@
         // =======================
         async function fetchEntries() {
             try {
-                const response = await fetch(GOOGLE_SCRIPT_URL);
+                // Änderung 2: Füge die 'cache: no-cache' Option hinzu.
+                const response = await fetch(GOOGLE_SCRIPT_URL, { cache: 'no-cache' });
                 if (!response.ok) throw new Error('Netzwerkfehler');
                 allEntries = await response.json();
                 generateCalendar(currentYear, currentMonth);
@@ -404,7 +403,8 @@
                     method: 'POST', mode: 'no-cors', 
                     body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' }
                 });
-                setTimeout(() => fetchEntries(), 1000);
+                // Änderung 1: Erhöhe den Timeout auf 2000 Millisekunden (2 Sekunden)
+                setTimeout(() => fetchEntries(), 2000);
             } catch (error) {
                 alert('Eintrag konnte nicht gespeichert werden.');
             }
