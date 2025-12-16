@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Task Planner (Firebase)</title>
+    <title>Daily Task Planner (Firebase + Drive)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     
     <script>
+        // Globale Event-Trigger für die Google-Bibliotheken
         function gapiLoaded() { window.dispatchEvent(new Event('gapi-loaded')); }
         function gisLoaded() { window.dispatchEvent(new Event('gis-loaded')); }
     </script>
@@ -16,14 +17,16 @@
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 
     <style>
-        /* ... Ihr CSS bleibt unverändert ... */
         :root { --bg-color: #f5f7fa; --card-bg: #ffffff; --text-color: #333; --primary-color: #007bff; --border-color: #e0e0e0; --today-highlight: #e7f3ff; --training-color: #4caf50; }
         body { font-family: 'Roboto', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         header h1 { margin: 0; }
         .header-buttons { display: flex; gap: 10px; }
         header button { background-color: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: background-color: 0.3s; }
-        #authBtn:disabled { background-color: #aaa; cursor: not-allowed; }
+        header button:hover { background-color: #0056b3; }
+        #authBtn { background-color: #4caf50; }
+        #authBtn:disabled { background-color: #9E9E9E; cursor: not-allowed; }
+        #signoutBtn { background-color: #f44336; }
         #calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 10px; }
         #calendar-header h2 { margin: 0; }
         #calendar-header button { background: none; border: 1px solid var(--border-color); cursor: pointer; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; }
@@ -45,6 +48,7 @@
         #taskForm label, #trainingForm label, #detailsModal label { display: block; margin-bottom: 8px; font-weight: 500; }
         #taskForm input, #taskForm textarea, #taskForm select, #trainingForm input, #trainingForm textarea { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; }
         #taskForm button, #trainingForm button { padding: 10px 15px; border-radius: 6px; border: 1px solid var(--primary-color); background-color: var(--primary-color); color: white; cursor: pointer; margin-right: 10px; }
+        #taskForm button:disabled, #trainingForm button:disabled { background-color: #ccc; cursor: wait; }
         #taskForm button.prev-btn { background-color: transparent; color: var(--primary-color); }
         .calendar-info { background-color: #e7f3ff; border: 1px solid #b3d7ff; padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 14px; }
         #detailsModal .detail-content { background-color: #f9f9f9; padding: 10px; border-radius: 6px; margin-bottom: 10px; }
@@ -53,9 +57,8 @@
 <body>
 
     <header>
-        <h1>Daily Task Planner (Firebase)</h1>
+        <h1>Daily Task Planner (Firebase + Drive)</h1>
         <div class="header-buttons">
-            <!-- KORREKTUR: Button ist anfangs deaktiviert -->
             <button id="authBtn" disabled>Laden...</button>
             <button id="signoutBtn" style="display: none;">Abmelden</button>
             <button id="openModalBtn" style="display: none;">+ Neuer Eintrag</button>
@@ -72,17 +75,25 @@
         <div id="calendar-grid"></div>
     </main>
 
-    <!-- Alle Modals bleiben unverändert -->
-    <div id="themaModal" class="modal"><div class="modal-content">...</div></div>
-    <div id="taskModal" class="modal"><div class="modal-content">...</div></div>
-    <div id="trainingModal" class="modal"><div class="modal-content">...</div></div>
-    <div id="detailsModal" class="modal"><div class="modal-content">...</div></div>
+    <div id="themaModal" class="modal"><div class="modal-content"><span class="close-btn">&times;</span><h2>Neuen Eintrag erstellen</h2><label for="themaAuswahl">Wählen Sie ein Thema aus:</label><select id="themaAuswahl" style="width: 100%; padding: 10px; margin-bottom: 20px;"><option value="">-- Bitte auswählen --</option><option value="Training">Training</option><option value="Konzept">Konzept</option><option value="Admin / Orga">Admin / Orga</option><option value="Blocker">Blocker</option></select><button id="themaWeiterBtn">Weiter</button></div></div>
+    
+    <div id="taskModal" class="modal"><div class="modal-content"><span class="close-btn">&times;</span><h2 id="taskModalTitle">Neue Aufgabe erstellen</h2><form id="taskForm"><div class="form-step active" data-step="1"><label for="taskDeadline">Für welchen Tag ist die Aufgabe (Deadline)?</label><input type="date" id="taskDeadline" required><div class="calendar-info"><p><strong>Ihre Google Kalender Termine:</p></strong><div id="calendarEvents"><em>Bitte anmelden & Datum wählen.</em></div></div><button type="button" class="next-btn">Weiter</button></div><div class="form-step" data-step="2"><label for="taskZustaendig">Wer ist zuständig?</label><input type="text" id="taskZustaendig" required><button type="button" class="prev-btn">Zurück</button><button type="button" class="next-btn">Weiter</button></div><div class="form-step" data-step="3"><label for="taskInhalt">Details zur Aufgabe:</label><textarea id="taskInhalt" rows="4"></textarea><button type="button" class="prev-btn">Zurück</button><button type="button" class="next-btn">Weiter</button></div><div class="form-step" data-step="4"><label for="taskStatus">Setzen Sie den Status:</label><select id="taskStatus"><option>Offen</option><option>In Bearbeitung</option><option>Wartet auf Rückmeldung</option><option>Erledigt</option></select><button type="button" class="prev-btn">Zurück</button><button type="submit">Aufgabe speichern</button></div></form></div></div>
+    
+    <div id="trainingModal" class="modal"><div class="modal-content"><span class="close-btn">&times;</span><h2>Neues Training eintragen</h2><form id="trainingForm"><label for="trainingPartner">Partner:</label><input type="text" id="trainingPartner" required><label for="trainingDatum">Datum:</label><input type="date" id="trainingDatum" required><label for="trainingUhrzeit">Uhrzeit:</label><input type="time" id="trainingUhrzeit" required><label for="trainingDauer">Dauer (in Std.):</label><input type="number" id="trainingDauer" step="0.5" required><label for="trainingFoto">Foto hochladen (optional):</label><input type="file" id="trainingFoto" accept="image/*"><label for="trainingFeedback">Feedback:</label><textarea id="trainingFeedback" rows="3"></textarea><button type="submit">Training speichern</button></form></div></div>
+    
+    <div id="detailsModal" class="modal"><div class="modal-content"><span class="close-btn">&times;</span><h2 id="detailsTitle"></h2><div id="detailsBody"></div></div></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getFirestore, collection, onSnapshot, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
+
+        // =======================
+        // KONFIGURATION
+        // =======================
+        
+        // Ihre bereitgestellte URL für den Foto-Upload
+        const APPS_SCRIPT_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbxVWEDwd33UNc4YjXtgasbUNarc-0xlU-ObcJEKqt6EUGE_J0yciBfYI7pWlYwW-g6-/exec';
 
         const firebaseConfig = {
           apiKey: "AIzaSyBWwi615j3y9yd2o4-H-FPDiZ30h7Zzr8w",
@@ -98,13 +109,12 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const storage = getStorage(app);
 
         let allTasks = [], allTrainings = [], currentUser = null;
         let currentMonth = new Date().getMonth(), currentYear = new Date().getFullYear();
         let unsubscribeTasks = () => {}, unsubscribeTrainings = () => {};
         
-        // KORREKTUR: Die Initialisierungsfunktion wartet auf das Event und aktiviert dann den Button
+        // GAPI laden und Button aktivieren
         window.addEventListener('gapi-loaded', async () => {
             await gapi.load('client');
             await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] });
@@ -128,9 +138,12 @@
             if (user) {
                 currentUser = user;
                 updateSigninStatus(true);
-                // Wichtig: Wir müssen sicherstellen, dass das Token, das wir von Firebase bekommen, auch an die GAPI übergeben wird.
-                // Das geschieht jetzt in handleAuthClick, da dort der explizite Login stattfindet.
                 fetchEntries();
+                // Versuchen, das GAPI Token wiederherzustellen/anzufordern, falls nötig
+                if(gapi && gapi.client && !gapi.client.getToken()) {
+                    // Hinweis: Das Firebase Token gilt nicht für GAPI Kalender. 
+                    // Der User muss ggf. noch einmal klicken, wenn der Kalenderzugriff abgelaufen ist.
+                }
             } else {
                 currentUser = null;
                 updateSigninStatus(false);
@@ -148,7 +161,6 @@
                 .then((result) => {
                     const credential = GoogleAuthProvider.credentialFromResult(result);
                     if (credential && credential.accessToken) {
-                         // Wichtig: Sicherstellen, dass gapi.client existiert, bevor wir es benutzen.
                          if(gapi && gapi.client) {
                              gapi.client.setToken({ access_token: credential.accessToken });
                          }
@@ -157,10 +169,251 @@
                 .catch(error => console.error("Anmeldefehler:", error));
         }
 
-        // Der Rest des Codes ist identisch mit der Version, die die Fehler `daysInMonth` und die Formularnavigation behoben hat.
-        // Fügen Sie hier den gesamten restlichen JavaScript-Code aus meiner letzten Antwort ein.
-        // ... (handleSignoutClick, updateSigninStatus, fetchEntries, generateCalendar, showDetails, loadCalendarEvents, etc.) ...
+        function handleSignoutClick() { signOut(auth); }
+        function updateSigninStatus(isSignedIn) {
+            document.getElementById('authBtn').style.display = isSignedIn ? 'none' : 'block';
+            document.getElementById('signoutBtn').style.display = isSignedIn ? 'block' : 'none';
+            document.getElementById('openModalBtn').style.display = isSignedIn ? 'block' : 'none';
+        }
 
+        function unsubscribeListeners() { unsubscribeTasks(); unsubscribeTrainings(); }
+        
+        function fetchEntries() {
+            if (!currentUser) return;
+            unsubscribeListeners();
+            const tasksRef = collection(db, 'tasks');
+            unsubscribeTasks = onSnapshot(tasksRef, (snapshot) => {
+                allTasks = snapshot.docs.map(doc => ({ id: doc.id, type: 'task', ...doc.data() }));
+                generateCalendar(currentYear, currentMonth);
+            }, (error) => console.error("Fehler beim Laden der Tasks:", error));
+            const trainingsRef = collection(db, 'trainings');
+            unsubscribeTrainings = onSnapshot(trainingsRef, (snapshot) => {
+                allTrainings = snapshot.docs.map(doc => ({ id: doc.id, type: 'training', ...doc.data() }));
+                generateCalendar(currentYear, currentMonth);
+            }, (error) => console.error("Fehler beim Laden der Trainings:", error));
+        }
+        
+        function changeMonth(direction) {
+            currentMonth += direction;
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            generateCalendar(currentYear, currentMonth);
+        }
+
+        function generateCalendar(year, month) {
+            const grid = document.getElementById('calendar-grid');
+            const header = document.getElementById('currentMonthYear');
+            const weekdaysContainer = document.getElementById('calendar-weekdays');
+            if (!grid || !header || !weekdaysContainer) return;
+            grid.innerHTML = '';
+            header.innerText = new Date(year, month).toLocaleString('de-DE', { month: 'long', year: 'numeric' });
+            if (weekdaysContainer.innerHTML === '') {
+                const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+                weekdays.forEach(day => { weekdaysContainer.innerHTML += `<div class="calendar-day-header">${day}</div>`; });
+            }
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            let startingDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+            for (let i = 0; i < startingDay; i++) { grid.innerHTML += '<div class="calendar-day other-month"></div>'; }
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(year, month, day);
+                let dayCell = document.createElement('div');
+                dayCell.className = 'calendar-day';
+                if (date.toDateString() === new Date().toDateString()) dayCell.classList.add('today');
+                dayCell.innerHTML = `<div class="day-number">${day}</div>`;
+                const allEntries = allTasks.concat(allTrainings);
+                const entriesForDay = allEntries.filter(entry => {
+                    const entryDateTimestamp = entry.date || entry.datum;
+                    if (entryDateTimestamp && typeof entryDateTimestamp.toDate === 'function') {
+                        return entryDateTimestamp.toDate().toDateString() === date.toDateString();
+                    }
+                    return false;
+                });
+                entriesForDay.forEach(entry => {
+                    const card = document.createElement('div');
+                    card.className = 'task-card';
+                    card.onclick = () => showDetails(entry);
+                    if (entry.type === 'task') {
+                        card.innerHTML = `<h3>${entry.topic}</h3><p>${entry.zustaendig || ''}</p>`;
+                    } else if (entry.type === 'training') {
+                        card.classList.add('training-card');
+                        card.innerHTML = `<h3>Training: ${entry.partner}</h3><p>${entry.uhrzeit}, ${entry.dauer}h</p>`;
+                    }
+                    dayCell.appendChild(card);
+                });
+                grid.appendChild(dayCell);
+            }
+        }
+        
+        function showDetails(entry) {
+            const title = document.getElementById('detailsTitle');
+            const body = document.getElementById('detailsBody');
+            body.innerHTML = '';
+            if (entry.type === 'task') {
+                title.innerText = `Task: ${entry.topic}`;
+                body.innerHTML = `<div class="detail-content"><strong>Zuständig:</strong> ${entry.zustaendig}</div><div class="detail-content"><strong>Status:</strong> ${entry.status}</div><div class="detail-content"><strong>Details:</strong><br>${entry.inhalt || 'Keine Details'}</div><div class="detail-content"><strong>Deadline:</strong> ${entry.deadline.toDate().toLocaleDateString('de-DE')}</div>`;
+            } else if (entry.type === 'training') {
+                title.innerText = `Training: ${entry.partner}`;
+                let photoHtml = entry.photoUrl ? `<p><a href="${entry.photoUrl}" target="_blank" rel="noopener noreferrer">Foto im Drive öffnen</a></p>` : '<p>Kein Foto hochgeladen.</p>';
+                body.innerHTML = `<div class="detail-content"><strong>Datum:</strong> ${entry.datum.toDate().toLocaleDateString('de-DE')} um ${entry.uhrzeit} Uhr</div><div class="detail-content"><strong>Dauer:</strong> ${entry.dauer} Stunden</div><div class="detail-content"><strong>Feedback:</strong><br>${entry.feedback || 'Kein Feedback'}</div><div class="detail-content">${photoHtml}</div>`;
+            }
+            document.getElementById('detailsModal').style.display = 'flex';
+        }
+
+        async function loadCalendarEvents() {
+            const selectedDate = document.getElementById('taskDeadline').value;
+            const token = gapi.client.getToken();
+            if (!selectedDate || !token) { 
+                if(!token) document.getElementById('calendarEvents').innerHTML = '<em>Bitte neu anmelden für Kalenderzugriff.</em>';
+                return; 
+            }
+            const eventsDiv = document.getElementById('calendarEvents');
+            if (!eventsDiv) return;
+            eventsDiv.innerHTML = '<em>Lade Termine...</em>';
+            try {
+                const timeMin = new Date(selectedDate); timeMin.setHours(0,0,0,0);
+                const timeMax = new Date(selectedDate); timeMax.setHours(23,59,59,999);
+                const response = await gapi.client.calendar.events.list({
+                    'calendarId': 'primary', 'timeMin': timeMin.toISOString(), 'timeMax': timeMax.toISOString(), 'singleEvents': true, 'orderBy': 'startTime'
+                });
+                const events = response.result.items;
+                if (!events || events.length == 0) { eventsDiv.innerHTML = '<em>Keine Termine für diesen Tag.</em>'; return; }
+                let html = '<ul>' + events.map(event => `<li><strong>${new Date(event.start.dateTime || event.start.date).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})}</strong> - ${event.summary}</li>`).join('') + '</ul>';
+                eventsDiv.innerHTML = html;
+            } catch (err) { eventsDiv.innerHTML = '<em>Fehler beim Laden der Termine.</em>'; }
+        }
+
+        function setupAllModals() {
+            const modals = document.querySelectorAll('.modal');
+            const closeBtns = document.querySelectorAll('.close-btn');
+            const closeModal = () => modals.forEach(modal => modal.style.display = 'none');
+            document.getElementById('openModalBtn').onclick = () => document.getElementById('themaModal').style.display = 'flex';
+            closeBtns.forEach(btn => btn.onclick = closeModal);
+            window.onclick = (event) => { if (event.target.classList.contains('modal')) closeModal(); };
+            document.getElementById('themaWeiterBtn').onclick = () => {
+                const auswahl = document.getElementById('themaAuswahl').value;
+                if (!auswahl) return;
+                closeModal();
+                if (auswahl === 'Training') {
+                    document.getElementById('trainingModal').style.display = 'flex';
+                } else {
+                    document.getElementById('taskModalTitle').innerText = `Neue Aufgabe: ${auswahl}`;
+                    document.getElementById('taskModal').dataset.topic = auswahl;
+                    document.getElementById('taskModal').style.display = 'flex';
+                }
+            };
+            setupTaskForm();
+            setupTrainingForm();
+        }
+
+        function setupTaskForm() {
+            const form = document.getElementById('taskForm');
+            const nextBtns = form.querySelectorAll('.next-btn');
+            const prevBtns = form.querySelectorAll('.prev-btn');
+            const formSteps = form.querySelectorAll('.form-step');
+            let currentStep = 1;
+            function showStep(stepNumber) {
+                formSteps.forEach(step => step.classList.remove('active'));
+                const activeStep = form.querySelector(`.form-step[data-step="${stepNumber}"]`);
+                if(activeStep) activeStep.classList.add('active');
+            }
+            nextBtns.forEach(btn => btn.addEventListener('click', () => { if (currentStep < formSteps.length) { currentStep++; showStep(currentStep); } }));
+            prevBtns.forEach(btn => btn.addEventListener('click', () => { if (currentStep > 1) { currentStep--; showStep(currentStep); } }));
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const deadline = document.getElementById('taskDeadline').value;
+                if (!deadline) { return alert("Bitte ein Datum auswählen."); }
+                const taskPayload = {
+                    topic: document.getElementById('taskModal').dataset.topic,
+                    date: Timestamp.fromDate(new Date(deadline)),
+                    deadline: Timestamp.fromDate(new Date(deadline)),
+                    zustaendig: document.getElementById('taskZustaendig').value,
+                    inhalt: document.getElementById('taskInhalt').value,
+                    status: document.getElementById('taskStatus').value,
+                    erstellerId: currentUser.uid
+                };
+                saveEntry('tasks', taskPayload, 'Aufgabe');
+                form.closest('.modal').style.display = 'none';
+                form.reset();
+                currentStep = 1; showStep(currentStep);
+            });
+        }
+
+        function setupTrainingForm() {
+            const form = document.getElementById('trainingForm');
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const btn = form.querySelector('button[type="submit"]');
+                btn.disabled = true; btn.innerText = "Speichere...";
+
+                const photoInput = document.getElementById('trainingFoto');
+                const file = photoInput.files ? photoInput.files[0] : null;
+                const datum = document.getElementById('trainingDatum').value;
+                if (!datum) { alert("Bitte Datum wählen."); btn.disabled = false; btn.innerText = "Speichern"; return; }
+
+                let trainingPayload = {
+                    partner: document.getElementById('trainingPartner').value,
+                    datum: Timestamp.fromDate(new Date(datum)),
+                    uhrzeit: document.getElementById('trainingUhrzeit').value,
+                    dauer: document.getElementById('trainingDauer').value,
+                    feedback: document.getElementById('trainingFeedback').value,
+                    photoUrl: '', 
+                    erstellerId: currentUser.uid
+                };
+
+                try {
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(file);
+                        reader.onload = async () => {
+                            const base64Data = reader.result;
+                            try {
+                                const response = await fetch(APPS_SCRIPT_UPLOAD_URL, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'text/plain' },
+                                    body: JSON.stringify({
+                                        fileData: base64Data,
+                                        filename: file.name,
+                                        mimeType: file.type
+                                    })
+                                });
+                                const result = await response.json();
+                                if(result.status === 'success') {
+                                    trainingPayload.photoUrl = result.url;
+                                } else {
+                                    alert("Foto-Upload fehlgeschlagen: " + result.message);
+                                }
+                                await saveEntry('trainings', trainingPayload, 'Training');
+                                form.closest('.modal').style.display = 'none';
+                                form.reset();
+                            } catch(err) {
+                                console.error(err);
+                                alert("Netzwerkfehler beim Foto-Upload.");
+                            } finally {
+                                btn.disabled = false; btn.innerText = "Training speichern";
+                            }
+                        };
+                    } else {
+                        await saveEntry('trainings', trainingPayload, 'Training');
+                        form.closest('.modal').style.display = 'none';
+                        form.reset();
+                        btn.disabled = false; btn.innerText = "Training speichern";
+                    }
+                } catch (e) {
+                    console.error(e);
+                    btn.disabled = false; btn.innerText = "Training speichern";
+                }
+            });
+        }
+        
+        async function saveEntry(collectionName, payload, entryType) {
+            try {
+                await addDoc(collection(db, collectionName), payload);
+            } catch (e) {
+                console.error(`Fehler beim Speichern von ${entryType}: `, e);
+                alert(`${entryType} konnte nicht gespeichert werden.`);
+            }
+        }
     </script>
 </body>
 </html>
