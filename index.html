@@ -22,7 +22,14 @@
         #calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 10px; }
         #calendar-header h2 { margin: 0; }
         #calendar-header button { background: none; border: 1px solid var(--border-color); cursor: pointer; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; }
-        #calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        
+        /* KORREKTUR: Beide Container bekommen jetzt das Grid-Layout */
+        #calendar-grid, #calendar-weekdays { 
+            display: grid; 
+            grid-template-columns: repeat(7, 1fr); 
+            gap: 5px; 
+        }
+
         .calendar-day-header { font-weight: bold; text-align: center; padding: 10px 0; }
         .calendar-day { background-color: var(--card-bg); border: 1px solid var(--border-color); min-height: 120px; padding: 8px; border-radius: 4px; }
         .calendar-day.today { background-color: var(--today-highlight); border: 1px solid var(--primary-color); }
@@ -68,50 +75,44 @@
     </main>
 
     <!-- Alle Modals bleiben strukturell unverändert -->
-    <div id="themaModal" class="modal"> <!-- ... Inhalt ... --> </div>
-    <div id="taskModal" class="modal"> <!-- ... Inhalt ... --> </div>
-    <div id="trainingModal" class="modal"> <!-- ... Inhalt ... --> </div>
+    <div id="themaModal" class="modal">
+        <div class="modal-content"><span class="close-btn">&times;</span><h2>Neuen Eintrag erstellen</h2><label for="themaAuswahl">Wählen Sie ein Thema aus:</label><select id="themaAuswahl" style="width: 100%; padding: 10px; margin-bottom: 20px;"><option value="">-- Bitte auswählen --</option><option value="Training">Training</option><option value="Konzept">Konzept</option><option value="Admin / Orga">Admin / Orga</option><option value="Blocker">Blocker</option></select><button id="themaWeiterBtn">Weiter</button></div>
+    </div>
+    <div id="taskModal" class="modal">
+        <div class="modal-content"><span class="close-btn">&times;</span><h2 id="taskModalTitle">Neue Aufgabe erstellen</h2><form id="taskForm"><div class="form-step active" data-step="1"><label for="taskDeadline">Für welchen Tag ist die Aufgabe (Deadline)?</label><input type="date" id="taskDeadline" required><div class="calendar-info"><p><strong>Google Kalender Termine:</strong></p><div id="calendarEvents"></div></div><button type="button" class="next-btn">Weiter</button></div><div class="form-step" data-step="2"><label for="taskZustaendig">Wer ist zuständig?</label><input type="text" id="taskZustaendig" required><button type="button" class="prev-btn">Zurück</button><button type="button" class="next-btn">Weiter</button></div><div class="form-step" data-step="3"><label for="taskInhalt">Details zur Aufgabe:</label><textarea id="taskInhalt" rows="4"></textarea><button type="button" class="prev-btn">Zurück</button><button type="button" class="next-btn">Weiter</button></div><div class="form-step" data-step="4"><label for="taskStatus">Setzen Sie den Status:</label><select id="taskStatus"><option>Offen</option><option>In Bearbeitung</option><option>Wartet auf Rückmeldung</option><option>Erledigt</option></select><button type="button" class="prev-btn">Zurück</button><button type="submit">Aufgabe speichern</button></div></form></div>
+    </div>
+    <div id="trainingModal" class="modal">
+        <div class="modal-content"><span class="close-btn">&times;</span><h2>Neues Training eintragen</h2><form id="trainingForm"><label for="trainingPartner">Partner:</label><input type="text" id="trainingPartner" required><label for="trainingDatum">Datum:</label><input type="date" id="trainingDatum" required><label for="trainingUhrzeit">Uhrzeit:</label><input type="time" id="trainingUhrzeit" required><label for="trainingDauer">Dauer (in Std.):</label><input type="number" id="trainingDauer" step="0.5" required><label for="trainingFoto">Foto hochladen (optional):</label><input type="file" id="trainingFoto" accept="image/*"><label for="trainingFeedback">Feedback:</label><textarea id="trainingFeedback" rows="3"></textarea><button type="submit">Training speichern</button></form></div>
+    </div>
 
     <script type="module">
-        // Firebase SDKs importieren (Browser-Version)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getFirestore, collection, onSnapshot, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
-        // =======================
-        // KONFIGURATION
-        // =======================
-        // Ihr firebaseConfig-Objekt wurde hier eingefügt
         const firebaseConfig = {
           apiKey: "AIzaSyBWwi615j3y9yd2o4-H-FPDiZ30h7Zzr8w",
           authDomain: "daily-task-a15ea.firebaseapp.com",
           projectId: "daily-task-a15ea",
-          storageBucket: "daily-task-a15ea.appspot.com", // korrigiert von .firebasestorage.app
+          storageBucket: "daily-task-a15ea.appspot.com",
           messagingSenderId: "28272097616",
           appId: "1:28272097616:web:ad9108a35aaf6c8b07d455",
           measurementId: "G-J4XSJNW1PW"
         };
 
-        // Firebase initialisieren
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         const storage = getStorage(app);
 
-        // =======================
-        // GLOBALE VARIABLEN
-        // =======================
         let allEntries = [];
         let currentUser = null;
         let currentMonth = new Date().getMonth();
         let currentYear = new Date().getFullYear();
-        let unsubscribeTasks = () => {}; // Leere Funktionen zum Abbestellen der Listener
+        let unsubscribeTasks = () => {};
         let unsubscribeTrainings = () => {};
 
-        // =======================
-        // INITIALISIERUNG & AUTH-STATUS
-        // =======================
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('authBtn').onclick = handleAuthClick;
             document.getElementById('signoutBtn').onclick = handleSignoutClick;
@@ -121,26 +122,20 @@
             setupAllModals();
         });
 
-        // Dieser Listener ist der neue "Einstiegspunkt" der App
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // Nutzer ist angemeldet
                 currentUser = user;
                 updateSigninStatus(true);
                 fetchEntries();
             } else {
-                // Nutzer ist abgemeldet
                 currentUser = null;
                 updateSigninStatus(false);
                 allEntries = [];
-                unsubscribeListeners(); // Wichtig: Alte Listener abbestellen
-                generateCalendar(currentYear, currentMonth); // Kalender leeren
+                unsubscribeListeners();
+                generateCalendar(currentYear, currentMonth);
             }
         });
 
-        // =======================
-        // AUTHENTIFIZIERUNG
-        // =======================
         function handleAuthClick() {
             const provider = new GoogleAuthProvider();
             signInWithPopup(auth, provider).catch(error => console.error("Anmeldefehler:", error));
@@ -156,9 +151,6 @@
             document.getElementById('openModalBtn').style.display = isSignedIn ? 'block' : 'none';
         }
 
-        // =======================
-        // DATEN-MANAGEMENT (FIREBASE)
-        // =======================
         function unsubscribeListeners() {
             unsubscribeTasks();
             unsubscribeTrainings();
@@ -167,7 +159,7 @@
         function fetchEntries() {
             if (!currentUser) return;
             
-            unsubscribeListeners(); // Alte Listener stoppen, bevor neue erstellt werden
+            unsubscribeListeners();
 
             const tasksRef = collection(db, 'tasks');
             unsubscribeTasks = onSnapshot(tasksRef, (snapshot) => {
@@ -185,26 +177,30 @@
         }
         
         // =======================
-        // KALENDER-LOGIK (mit Timestamp-Konvertierung)
+        // KALENDER-LOGIK (KORRIGIERT)
         // =======================
         function generateCalendar(year, month) {
             const grid = document.getElementById('calendar-grid');
             const header = document.getElementById('currentMonthYear');
+            const weekdaysContainer = document.getElementById('calendar-weekdays');
+
+            if (!grid || !header || !weekdaysContainer) return; // Sicherheitsabfrage
+
             grid.innerHTML = '';
             header.innerText = new Date(year, month).toLocaleString('de-DE', { month: 'long', year: 'numeric' });
             
-            const firstDayOfMonth = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            
-            if (document.getElementById('calendar-weekdays').innerHTML === '') {
-                const weekdaysContainer = document.getElementById('calendar-weekdays');
-                weekdaysContainer.id = 'calendar-grid';
-                ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'].forEach(day => {
+            // KORREKTUR: Die Wochentage werden nur einmal erstellt und der Container wird nicht mehr umbenannt.
+            if (weekdaysContainer.innerHTML === '') {
+                const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+                weekdays.forEach(day => {
                     weekdaysContainer.innerHTML += `<div class="calendar-day-header">${day}</div>`;
                 });
             }
+            
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-            let startingDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+            let startingDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; // Mo=0, Di=1... So=6
             for (let i = 0; i < startingDay; i++) { grid.innerHTML += '<div class="calendar-day other-month"></div>'; }
 
             for (let day = 1; day <= daysInMonth; day++) {
@@ -222,21 +218,64 @@
                     return false;
                 });
                 
-                entriesForDay.forEach(entry => { /* ... (Anzeigelogik bleibt gleich) ... */ });
+                entriesForDay.forEach(entry => {
+                    if (entry.type === 'task') {
+                        dayCell.innerHTML += `<div class="task-card"><h3>${entry.topic}</h3><p><svg class="person-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>${entry.zustaendig}</p></div>`;
+                    } else if (entry.type === 'training') {
+                        let photoHtml = '';
+                        if (entry.photoUrl && entry.photoUrl.startsWith('http')) {
+                            photoHtml = `<p><a href="${entry.photoUrl}" target="_blank" rel="noopener noreferrer">Foto ansehen</a></p>`;
+                        }
+                        dayCell.innerHTML += `<div class="task-card training-card"><h3>Training: ${entry.partner}</h3><p>${entry.uhrzeit}, ${entry.dauer}h</p>${photoHtml}</div>`;
+                    }
+                });
                 grid.appendChild(dayCell);
             }
         }
-        function changeMonth(dir) { /* ... (unverändert) ... */ }
+        function changeMonth(direction) {
+            currentMonth += direction;
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            generateCalendar(currentYear, currentMonth);
+        }
 
         // =======================
         // FORMULARE & SPEICHERN
         // =======================
-        function setupAllModals() { /* ... (unverändert) ... */ }
+        function setupAllModals() {
+            const modals = document.querySelectorAll('.modal');
+            const closeBtns = document.querySelectorAll('.close-btn');
+            
+            document.getElementById('openModalBtn').onclick = () => document.getElementById('themaModal').style.display = 'flex';
+            
+            const closeModal = () => modals.forEach(modal => modal.style.display = 'none');
+            closeBtns.forEach(btn => btn.onclick = closeModal);
+            window.onclick = (event) => { if (event.target.classList.contains('modal')) closeModal(); };
+            
+            document.getElementById('themaWeiterBtn').onclick = () => {
+                const auswahl = document.getElementById('themaAuswahl').value;
+                if (!auswahl) return;
+                closeModal();
+                if (auswahl === 'Training') {
+                    document.getElementById('trainingModal').style.display = 'flex';
+                } else {
+                    document.getElementById('taskModalTitle').innerText = `Neue Aufgabe: ${auswahl}`;
+                    document.getElementById('taskModal').dataset.topic = auswahl;
+                    document.getElementById('taskModal').style.display = 'flex';
+                }
+            };
+            
+            setupTaskForm();
+            setupTrainingForm();
+        }
+
         function setupTaskForm() {
             const form = document.getElementById('taskForm');
             form.addEventListener('submit', (event) => {
                 event.preventDefault();
                 const deadline = document.getElementById('taskDeadline').value;
+                if (!deadline) { return alert("Bitte ein Datum auswählen."); }
+                
                 const taskPayload = {
                     topic: document.getElementById('taskModal').dataset.topic,
                     date: Timestamp.fromDate(new Date(deadline)),
@@ -244,10 +283,10 @@
                     zustaendig: document.getElementById('taskZustaendig').value,
                     inhalt: document.getElementById('taskInhalt').value,
                     status: document.getElementById('taskStatus').value,
-                    erstellerId: currentUser.uid // Wichtig für Sicherheitsregeln später
+                    erstellerId: currentUser.uid
                 };
                 saveEntry('tasks', taskPayload, 'Aufgabe');
-                document.getElementById('taskModal').style.display = 'none';
+                form.closest('.modal').style.display = 'none';
                 form.reset();
             });
         }
@@ -265,31 +304,27 @@
                     uhrzeit: document.getElementById('trainingUhrzeit').value,
                     dauer: document.getElementById('trainingDauer').value,
                     feedback: document.getElementById('trainingFeedback').value,
-                    photoUrl: '', // Initial leer
+                    photoUrl: '',
                     erstellerId: currentUser.uid
                 };
                 
+                form.closest('.modal').style.display = 'none';
+                form.reset();
+
                 if (file) {
-                    // Wenn ein Foto da ist, lade es hoch und speichere DANN erst die Daten
                     const uniqueFileName = `${currentUser.uid}-${Date.now()}-${file.name}`;
                     const storageRef = ref(storage, `training-uploads/${uniqueFileName}`);
-                    
                     try {
                         const uploadTask = await uploadBytes(storageRef, file);
-                        const downloadURL = await getDownloadURL(uploadTask.ref);
-                        trainingPayload.photoUrl = downloadURL; // Füge die URL hinzu
+                        trainingPayload.photoUrl = await getDownloadURL(uploadTask.ref);
                         await saveEntry('trainings', trainingPayload, 'Training');
                     } catch (error) {
                         console.error("Fehler beim Foto-Upload:", error);
-                        alert("Das Training konnte nicht gespeichert werden, da der Foto-Upload fehlschlug.");
+                        alert("Das Training konnte nicht gespeichert werden (Foto-Upload fehlgeschlagen).");
                     }
                 } else {
-                    // Wenn kein Foto da ist, speichere direkt
                     await saveEntry('trainings', trainingPayload, 'Training');
                 }
-                
-                document.getElementById('trainingModal').style.display = 'none';
-                form.reset();
             });
         }
         
@@ -297,9 +332,8 @@
             if (!currentUser) return alert("Bitte zuerst anmelden.");
             try {
                 await addDoc(collection(db, collectionName), payload);
-                // Kein fetchEntries() nötig, onSnapshot macht das automatisch!
             } catch (e) {
-                console.error(`Fehler beim Hinzufügen von ${entryType}: `, e);
+                console.error(`Fehler beim Speichern von ${entryType}: `, e);
                 alert(`${entryType} konnte nicht gespeichert werden.`);
             }
         }
