@@ -22,14 +22,7 @@
         #calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 10px; }
         #calendar-header h2 { margin: 0; }
         #calendar-header button { background: none; border: 1px solid var(--border-color); cursor: pointer; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; }
-        
-        /* KORREKTUR: Beide Container bekommen jetzt das Grid-Layout */
-        #calendar-grid, #calendar-weekdays { 
-            display: grid; 
-            grid-template-columns: repeat(7, 1fr); 
-            gap: 5px; 
-        }
-
+        #calendar-weekdays, #calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
         .calendar-day-header { font-weight: bold; text-align: center; padding: 10px 0; }
         .calendar-day { background-color: var(--card-bg); border: 1px solid var(--border-color); min-height: 120px; padding: 8px; border-radius: 4px; }
         .calendar-day.today { background-color: var(--today-highlight); border: 1px solid var(--primary-color); }
@@ -74,7 +67,7 @@
         <div id="calendar-grid"></div>
     </main>
 
-    <!-- Alle Modals bleiben strukturell unverändert -->
+    <!-- KORREKTUR: Modals mit vollständigem Inhalt -->
     <div id="themaModal" class="modal">
         <div class="modal-content"><span class="close-btn">&times;</span><h2>Neuen Eintrag erstellen</h2><label for="themaAuswahl">Wählen Sie ein Thema aus:</label><select id="themaAuswahl" style="width: 100%; padding: 10px; margin-bottom: 20px;"><option value="">-- Bitte auswählen --</option><option value="Training">Training</option><option value="Konzept">Konzept</option><option value="Admin / Orga">Admin / Orga</option><option value="Blocker">Blocker</option></select><button id="themaWeiterBtn">Weiter</button></div>
     </div>
@@ -176,20 +169,23 @@
             }, (error) => console.error("Fehler beim Laden der Trainings:", error));
         }
         
-        // =======================
-        // KALENDER-LOGIK (KORRIGIERT)
-        // =======================
+        function changeMonth(direction) {
+            currentMonth += direction;
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            generateCalendar(currentYear, currentMonth);
+        }
+
         function generateCalendar(year, month) {
             const grid = document.getElementById('calendar-grid');
             const header = document.getElementById('currentMonthYear');
             const weekdaysContainer = document.getElementById('calendar-weekdays');
 
-            if (!grid || !header || !weekdaysContainer) return; // Sicherheitsabfrage
+            if (!grid || !header || !weekdaysContainer) return;
 
             grid.innerHTML = '';
             header.innerText = new Date(year, month).toLocaleString('de-DE', { month: 'long', year: 'numeric' });
             
-            // KORREKTUR: Die Wochentage werden nur einmal erstellt und der Container wird nicht mehr umbenannt.
             if (weekdaysContainer.innerHTML === '') {
                 const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
                 weekdays.forEach(day => {
@@ -200,7 +196,7 @@
             const firstDayOfMonth = new Date(year, month, 1).getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-            let startingDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1; // Mo=0, Di=1... So=6
+            let startingDay = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
             for (let i = 0; i < startingDay; i++) { grid.innerHTML += '<div class="calendar-day other-month"></div>'; }
 
             for (let day = 1; day <= daysInMonth; day++) {
@@ -232,16 +228,7 @@
                 grid.appendChild(dayCell);
             }
         }
-        function changeMonth(direction) {
-            currentMonth += direction;
-            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
-            else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
-            generateCalendar(currentYear, currentMonth);
-        }
 
-        // =======================
-        // FORMULARE & SPEICHERN
-        // =======================
         function setupAllModals() {
             const modals = document.querySelectorAll('.modal');
             const closeBtns = document.querySelectorAll('.close-btn');
