@@ -237,7 +237,6 @@
             setupTrainingForm();
         }
 
-        // KORREKTUR: Die Navigationslogik für das mehrstufige Formular wird wieder hinzugefügt.
         function setupTaskForm() {
             const form = document.getElementById('taskForm');
             const nextBtns = form.querySelectorAll('.next-btn');
@@ -285,7 +284,7 @@
                 saveEntry('tasks', taskPayload, 'Aufgabe');
                 form.closest('.modal').style.display = 'none';
                 form.reset();
-                currentStep = 1; // Wichtig: Formular für den nächsten Aufruf zurücksetzen
+                currentStep = 1;
                 showStep(currentStep);
             });
         }
